@@ -181,9 +181,21 @@ func NewTopology(nodes map[string]*Node, peers map[string]*Peer, granularity Gra
 		sort.Slice(allowedLocationIPs, func(i, j int) bool {
 			return allowedLocationIPs[i].String() < allowedLocationIPs[j].String()
 		})
+
+		var endpoint *wireguard.Endpoint = topoMap[location][leader].Endpoint
+		// If network is fully meshed check if we can use the private network
+		if granularity == FullGranularity && t.privateIP != nil && topoMap[location][leader].InternalIP != nil {
+			if t.privateIP.Contains(topoMap[location][leader].InternalIP.IP) {
+				endpoint = wireguard.NewEndpoint(
+					topoMap[location][leader].InternalIP.IP,
+					topoMap[location][leader].Endpoint.Port(),
+				)
+			}
+		}
+
 		t.segments = append(t.segments, &segment{
 			allowedIPs:          allowedIPs,
-			endpoint:            topoMap[location][leader].Endpoint,
+			endpoint:            endpoint,
 			key:                 topoMap[location][leader].Key,
 			persistentKeepalive: topoMap[location][leader].PersistentKeepalive,
 			location:            location,
@@ -193,7 +205,7 @@ func NewTopology(nodes map[string]*Node, peers map[string]*Peer, granularity Gra
 			privateIPs:          privateIPs,
 			allowedLocationIPs:  allowedLocationIPs,
 		})
-		level.Debug(t.logger).Log("msg", "generated segment", "location", location, "allowedIPs", allowedIPs, "endpoint", topoMap[location][leader].Endpoint, "cidrs", cidrs, "hostnames", hostnames, "leader", leader, "privateIPs", privateIPs, "allowedLocationIPs", allowedLocationIPs)
+		level.Debug(t.logger).Log("msg", "generated segment", "location", location, "allowedIPs", allowedIPs, "endpoint", endpoint, "cidrs", cidrs, "hostnames", hostnames, "leader", leader, "privateIPs", privateIPs, "allowedLocationIPs", allowedLocationIPs)
 
 	}
 	// Sort the Topology segments so the result is stable.
